@@ -17,7 +17,7 @@ function buildNav(){
  const nav=document.querySelector('.nav');if(!nav)return;
  nav.replaceChildren();
  for(const [id,symbol,title] of [['home','⌂','Home'],['shift','◉','Shift'],['planner','◇','Planner'],['records','▤','Records'],['settings','⚙','Settings']]){
-  const b=document.createElement('button');b.type='button';b.className=current===id?'active':'';
+  const b=document.createElement('button');b.type='button';b.id=({home:'navhome',planner:'navpots',records:'navrecords',settings:'navsettings',shift:'navshift'})[id];b.className=current===id?'active':'';
   const i=document.createElement('span');i.textContent=symbol;b.append(i,document.createTextNode(title));b.onclick=()=>render(id);nav.append(b);
  }
 }
