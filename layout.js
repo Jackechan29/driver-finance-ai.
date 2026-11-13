@@ -54,7 +54,7 @@ function render(name){
   const p=document.createElement('p');p.textContent='Only mark money as saved when you have genuinely set it aside.';
   c.append(h,p,btn('Open Money Guide',()=>openFeature('guide')));s.append(c);
   const d=document.createElement('div');d.className='ux-feature';const h2=document.createElement('h3');h2.textContent='Bills & Money Pots';
-  d.append(h2,btn('Manage Bills',()=>{original('pots');current='planner';buildNav()}));s.append(d);
+  d.append(h2,btn('Manage Bills',()=>{original('pots');$('view')?.classList.remove('ux-planner');current='planner';buildNav()}));s.append(d);
  }
  if(name==='records'){
   const s=document.createElement('section');s.className='ux-feature';s.id='ux-record-top';
@@ -68,7 +68,7 @@ function render(name){
 }
 window.show=function(name){
  if(name==='home'||name==='records'||name==='settings')return render(name);
- if(name==='pots'){original(name);current='planner';buildNav();return}
+ if(name==='pots'){original(name);$('view')?.classList.remove('ux-planner');current='planner';buildNav();return}
  return original.apply(this,arguments)
 };
 function init(){
