@@ -32,7 +32,11 @@ function calculate(){
   }
   const dates=[...new Set(f.map(x=>new Date(x.date).toDateString()))].map(x=>new Date(x)).sort((a,b)=>a-b);
   const gaps=dates.slice(1).map((d,i)=>(d-dates[i])/86400000).filter(x=>x>0);
-  out[id]={earnings,diesel,todayEarnings,todayFuel,count:h.length,fillCount:f.length,averageFill:f.length?diesel/f.length:0,refillEvery:gaps.length?gaps.reduce((a,b)=>a+b,0)/gaps.length:null,patterns,available:Math.max(0,todayEarnings-todayFuel-(Number(state.reserves[id])||0))};
+  const reserve=Math.max(0,Number(state.reserves[id])||0);
+  const afterFuel=Math.max(0,todayEarnings-todayFuel);
+  // Reserve is an estimate, and may include fuel. Never present it as confirmed spendable cash.
+  const afterSeparateReserve=Math.max(0,afterFuel-reserve);
+  out[id]={earnings,diesel,todayEarnings,todayFuel,count:h.length,fillCount:f.length,averageFill:f.length?diesel/f.length:0,refillEvery:gaps.length?gaps.reduce((a,b)=>a+b,0)/gaps.length:null,patterns,afterFuel,afterSeparateReserve,reserve,available:afterSeparateReserve};
  }
  const funded=Math.max(0,Number(state.rentBalance)||0);
  const rent=Math.max(1,Number(state.rent||530));
@@ -48,13 +52,29 @@ function render(){
  return '<div class="sm-person"><b>'+(id==='me'?'You':'Brother')+'</b><div>Today earned: '+money(d.todayEarnings)+' · fuel purchased: '+money(d.todayFuel)+'</div><div>Today available after recorded fuel and daily reserve: <b>'+money(d.available)+'</b></div><div>All recorded shifts: '+d.count+' · earnings '+money(d.earnings)+' · fuel '+money(d.diesel)+'</div><div>Typical fuel purchase: '+(d.fillCount?money(d.averageFill):'not yet known')+'; refill interval: '+(d.refillEvery?d.refillEvery.toFixed(1)+' days':'not yet known')+'</div><div>'+compare+'</div></div>';
  };
  const history=(state.allocations||[]).slice().reverse().slice(0,6).map(x=>'<div class="sm-person">'+esc(x.driver==='me'?'You':'Brother')+' · '+money(x.amount)+' · '+esc(x.pot)+' · '+esc(x.date)+(x.test?' · test entry (excluded)':' · previous entry')+'</div>').join('');
- const guide=state.rentBalanceNeedsReview?'Previous entries were found. Check the amount saved below against your real money, then tap Save.':
- c.remaining===0?'Your next £'+c.rent.toFixed(2)+' rent payment is fully covered by the amount you have confirmed as saved. Keep it separate from spending money.':
- c.funded===0?'You have £0 saved towards the next £'+c.rent.toFixed(2)+' rent payment. That is okay. Start with your real earnings, then decide what you can put aside after essential costs.':
- 'You have '+money(c.funded)+' saved. You need another '+money(c.remaining)+' for the next rent payment. Only set aside money you actually have.';
- const warning='These are planning figures, not verified bank balances. Fuel purchases and the daily vehicle reserve may overlap; do not deduct the same fuel twice.';
+ const combined=data.me.todayEarnings+data.brother.todayEarnings;
+ const fuelToday=data.me.todayFuel+data.brother.todayFuel;
+ const afterFuel=data.me.afterFuel+data.brother.afterFuel;
+ const reserves=data.me.reserve+data.brother.reserve;
+ const afterSeparateReserves=data.me.afterSeparateReserve+data.brother.afterSeparateReserve;
+ const suggest=Math.min(c.remaining,afterSeparateReserves);
+ const counts=data.me.count+data.brother.count;
+ let guide;
+ if(state.rentBalanceNeedsReview){
+  guide='Please confirm the amount you genuinely have set aside for rent. Earlier entries remain in history but must not be assumed to be available cash.';
+ }else if(c.remaining===0){
+  guide='Your next rent target is fully covered by the amount you marked as saved. Keep that money separate; this app has not checked a bank account or transferred anything.';
+ }else if(combined<=0){
+  guide='You have '+money(c.funded)+' saved for rent and '+money(c.remaining)+' still to save. No shift earnings have been recorded today. Record real earnings and fuel costs to receive a useful suggestion.';
+ }else{
+  guide='Between both drivers, today you recorded '+money(combined)+' earned and '+money(fuelToday)+' spent on fuel. That leaves up to '+money(afterFuel)+' before other costs. ';
+  if(reserves>0)guide+='You also set '+money(reserves)+' in daily reserve estimates, which may overlap with fuel. ';
+  guide+='If the reserves are entirely separate from fuel and all other essentials are covered, up to '+money(suggest)+' could go towards the '+money(c.remaining)+' remaining rent target. This is only a suggestion: confirm what you actually save in the rent field.';
+ }
+ if(counts===0&&combined===0)guide+=' The app needs real completed shifts before it can compare working times.';
+ const warning='Planning estimates only: no bank connection, automatic transfers, or cross-phone sync. Keep money actually saved separate from suggested amounts. Diesel and daily reserves may overlap.';
  modal.innerHTML='<div class="sm-wrap" id="sm-wrap"><section class="sm-dialog" role="dialog" aria-modal="true"><div class="sm-head"><b>🧠 Your Money Guide</b><button id="sm-close" aria-label="Close">✕</button></div>'+
- '<p class="sm-muted">One rent balance. No duplicate contribution forms. Nothing transfers money automatically. Records stay on this phone.</p>'+
+ '<p class="sm-muted">One rent balance. No duplicate contribution forms. Guidance uses the shifts and fuel you record. Nothing transfers money automatically. Records stay on this phone.</p>'+
  '<div class="sm-highlight">Next rent target <strong>'+money(c.rent)+'</strong><div>Actually saved for next rent: <b>'+money(c.funded)+'</b></div><div>Still to save: <b>'+money(c.remaining)+'</b></div><div>Last month’s rent: Paid (separate from current savings)</div></div>'+
  '<div class="sm-guide"><b>💬 Your guide says</b><p id="sm-guide-text">'+esc(guide)+'</p><button class="sm-btn" id="sm-speak">🔊 Read guidance aloud</button><p class="sm-muted">This is automatic, rules-based guidance, not a live AI conversation. Spoken audio depends on your iPhone browser settings.</p></div>'+
  '<h3>Keep it simple</h3><label>Monthly rent target (£)<input id="sm-rent" type="number" min="1" step=".01" value="'+c.rent+'"></label>'+
@@ -63,7 +83,7 @@ function render(){
  (state.rentBalanceNeedsReview?'<p class="sm-muted">Please confirm the amount above. Old entries have been preserved for reference.</p>':'')+
  '<button class="sm-btn" id="sm-save">Save my rent figures</button>'+
  '<h3>Today’s shift information</h3>'+person('me')+person('brother')+
- '<details><summary>Advanced: daily reserves and history</summary><p class="sm-muted">These daily reserves are estimates, not extra payments. Avoid counting diesel twice.</p>'+
+ '<details><summary>Advanced: daily reserves and history</summary><p class="sm-muted">Reserves are estimates, not extra payments. If your reserve already includes diesel, do not treat the after-reserve figure as spendable cash. The guide gives conditional advice rather than subtracting diesel twice.</p>'+
  '<label>Your daily vehicle/tax reserve (£)<input id="sm-me" type="number" min="0" step=".01" value="'+Number(state.reserves.me||0)+'"></label>'+
  '<label>Brother’s daily vehicle/tax reserve (£)<input id="sm-brother" type="number" min="0" step=".01" value="'+Number(state.reserves.brother||0)+'"></label>'+
  '<button class="sm-btn" id="sm-reserves">Save reserves</button><h3>Earlier entries (kept for reference)</h3>'+(history||'<p>No previous entries</p>')+'</details>'+
