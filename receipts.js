@@ -35,7 +35,11 @@ async function onSave(e){
  if(f.size>20e6)return notice('Photo exceeds 20 MB. Choose a smaller image.',true);
  if(!Number.isFinite(amount)||amount<0)return notice('Enter an amount of zero or more.',true);
  const button=$('rv-save');button.disabled=true;
- try{await save({id:Date.now()+'-'+Math.random().toString(36).slice(2),photo:f,filename:f.name||'receipt',mime:f.type,date:$('rv-date').value,amount:Math.round(amount*100)/100,category:$('rv-category').value,driver:$('rv-driver').value,merchant:$('rv-merchant').value.trim(),created:new Date().toISOString()});$('rv-form').reset();$('rv-date').value=dateNow();notice('Receipt saved locally. Export ZIP regularly for safekeeping.');await list()}
+ try{
+ const existing=await all();
+ const same=existing.some(r=>r.date===$('rv-date').value&&r.category===$('rv-category').value&&r.driver===$('rv-driver').value&&Math.abs(r.amount-amount)<0.005&&(!r.merchant||!$('rv-merchant').value.trim()||r.merchant.toLowerCase()===$('rv-merchant').value.trim().toLowerCase()));
+ if(same&&!confirm('This looks like a receipt already saved for the same date, vehicle, category and amount. Save another copy anyway?'))return;
+ await save({id:Date.now()+'-'+Math.random().toString(36).slice(2),photo:f,filename:f.name||'receipt',mime:f.type,date:$('rv-date').value,amount:Math.round(amount*100)/100,category:$('rv-category').value,driver:$('rv-driver').value,merchant:$('rv-merchant').value.trim(),created:new Date().toISOString()});$('rv-form').reset();$('rv-date').value=dateNow();notice('Receipt saved locally. Export ZIP regularly for safekeeping.');await list()}
  catch(e){notice('Save failed: '+e.message+'. No expense was changed.',true)}finally{button.disabled=false}
 }
 const enc=s=>new TextEncoder().encode(s);
