@@ -15,7 +15,8 @@ function gps(){
  stopGPS();if(!state.active||!navigator.geolocation)return;
  watch=navigator.geolocation.watchPosition(p=>{
   const a=state.active;if(!a)return;
-  if(document.hidden){a.incomplete=true;save();return}\n  const c=p.coords,t=p.timestamp||Date.now();
+  if(document.hidden){a.incomplete=true;save();return}
+  const c=p.coords,t=p.timestamp||Date.now();
   if(c.accuracy>70||!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude))return;
   if(a.last){
    const dt=(t-a.last.time)/1000;
