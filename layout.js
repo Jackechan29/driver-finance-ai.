@@ -6,13 +6,16 @@ const $=id=>document.getElementById(id);
 let current='home';
 function btn(text,fn){const b=document.createElement('button');b.type='button';b.className='ux-button';b.textContent=text;b.onclick=fn;return b}
 function openFeature(which){
- const entry=which==='shift'?'dfa-open':which==='guide'?'sm-open':null;
- const attempt=()=>which==='receipt'?$('rv-card')?.querySelector('button'):$ (entry);
- let target=attempt();
- if(target){target.click();return}
- original('home');
- setTimeout(()=>{target=attempt();if(target)target.click();else alert('Feature is still loading. Please try again.')},100)
+ const target={shift:window.DFAOpenShift,guide:window.DFAOpenMoneyGuide,receipt:window.DFAOpenReceipts}[which];
+ if(typeof target==='function'){target();return}
+ const view=document.getElementById('view');
+ if(view){
+  const message=document.createElement('p');
+  message.className='ux-note';message.textContent='This feature did not load. Please reopen the app when your shift is finished.';
+  view.prepend(message);
+ }
 }
+
 function buildNav(){
  const nav=document.querySelector('.nav');if(!nav)return;
  nav.replaceChildren();
@@ -75,10 +78,10 @@ function init(){
  const css=[
  '.nav{z-index:9000!important;background:#061326!important;border-top:1px solid #285c83!important;padding:11px 3px max(15px,env(safe-area-inset-bottom))!important}',
  '.nav button{font-size:10px!important;flex:1!important;min-width:0!important;color:#a5bace!important}.nav button.active{color:#40c7ff!important}.nav span{font-size:21px!important}',
- '#view.ux-home>.actions,#view.ux-home>#dfa-entry,#view.ux-home>#sm-entry,#view.ux-home>#rv-card{display:none!important}',
+ '#view.ux-home>.actions,#view.ux-home>#dfa-entry,#view.ux-home>#sm-card,#view.ux-home>#rv-card{display:none!important}',
  '#view.ux-shift>:not(#ux-panel),#view.ux-planner>:not(#ux-panel){display:none!important}',
- '#view.ux-shift>#dfa-entry,#view.ux-shift>#sm-entry,#view.ux-shift>#rv-card,#view.ux-planner>#dfa-entry,#view.ux-planner>#sm-entry,#view.ux-planner>#rv-card{display:none!important}',
- '#view.ux-records>#dfa-entry,#view.ux-records>#sm-entry,#view.ux-records>#rv-card{display:none!important}',
+ '#view.ux-shift>#dfa-entry,#view.ux-shift>#sm-card,#view.ux-shift>#rv-card,#view.ux-planner>#dfa-entry,#view.ux-planner>#sm-card,#view.ux-planner>#rv-card{display:none!important}',
+ '#view.ux-records>#dfa-entry,#view.ux-records>#sm-card,#view.ux-records>#rv-card{display:none!important}',
  '.ux-home-actions,.ux-feature{background:linear-gradient(130deg,#0a2a48,#061525);border:1px solid #227ec0;border-radius:18px;padding:16px;margin:16px 0;color:white}',
  '.ux-home-actions h3,.ux-feature h3{font:bold 18px system-ui;margin:0 0 12px}.ux-group{display:flex;gap:8px}',
  '.ux-button{flex:1;min-width:0;min-height:55px;border:1px solid #298fd0;border-radius:12px;background:linear-gradient(110deg,#106fbb,#0b3e75);color:white;font:700 13px system-ui;padding:12px 5px}',
