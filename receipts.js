@@ -8,6 +8,8 @@ const all=()=>query('getAll','readonly');const save=r=>query('put','readwrite',r
 const dateNow=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 function notice(msg,error=false){const n=$('rv-message');if(n){n.textContent=msg;n.style.color=error?'#ffbaba':'#74f0d8'}}
 function close(){if(overlay){overlay.remove();overlay=null;document.body.style.overflow=''}}
+window.DFAOpenReceipts=open;
+
 async function list(){
  const box=$('rv-list');if(!box)return;
  try{
