@@ -88,9 +88,9 @@ function open(){
 function close(){if(modal){modal.remove();modal=null}document.body.style.overflow='';}
 function addEntry(){
  const v=document.getElementById('view');if(!v||document.getElementById('dfa-entry'))return;
- const div=document.createElement('div');div.id='dfa-entry';div.className='card';
- div.innerHTML='<div class="title">Smart Shift & Fuel</div><p class="small">Track working hours, log fuel and estimate miles. GPS requires the app to stay open.</p><button class="btn" id="dfa-open">🚕 Start / View Shift</button>';
- v.appendChild(div);document.getElementById('dfa-open').onclick=open;
+ const div=document.createElement('div');div.id='dfa-entry';div.className='card';div.style.cssText='margin:14px 0;border:1px solid #1b9cff;box-shadow:0 0 18px #0876d044;background:linear-gradient(125deg,#092443,#07172b)';
+ div.innerHTML='<div class="title">Smart Shift & Fuel</div><p class="small">Track working hours, log fuel and estimate miles. GPS requires the app to stay open.</p><button class="btn" id="dfa-open">🚕 Start Shift / Fuel</button>';
+ const actions=v.querySelector('.actions');if(actions){actions.insertAdjacentElement('afterend',div)}else{v.insertAdjacentElement('afterbegin',div)}document.getElementById('dfa-open').onclick=open;
 }
 function init(){
  const style=document.createElement('style');style.textContent=`
