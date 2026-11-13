@@ -44,11 +44,11 @@ function render(){
  '<p>For your Monday–Tuesday plan, aim for <b>'+money(c.remaining/4)+' each per day after costs</b> across two drivers and two days. This is a target, not a prediction.</p>'+
  person('me')+person('brother')+
  '<h3>Adjust financial assumptions</h3><label>Monthly rent (£)<input id="sm-rent" type="number" min="1" step=".01" value="'+c.rent+'"></label>'+
- '<label>Rent already saved before this tracker (£)<input id="sm-opening" type="number" min="0" step=".01" value="'+Number(state.opening||0)+'"></label>'+
+ '<label>Savings currently available towards rent (£; enter 0 if none)<input id="sm-opening" type="number" min="0" step=".01" value="'+Number(state.opening||0)+'"></label>'+
  '<label>Your daily fuel/vehicle/tax reserve (£)<input id="sm-me" type="number" min="0" step=".01" value="'+Number(state.reserves.me||0)+'"></label>'+
  '<label>Brother’s daily fuel/vehicle/tax reserve (£)<input id="sm-brother" type="number" min="0" step=".01" value="'+Number(state.reserves.brother||0)+'"></label>'+
  '<button class="sm-btn" id="sm-save">Save targets</button>'+
- '<h3>Record actual money put aside</h3><label>Driver<select id="sm-driver"><option value="me">You</option><option value="brother">Brother</option></select></label><label>Purpose<select id="sm-pot"><option value="rent">Rent</option><option value="other">Other bills</option></select></label><label>Amount (£)<input id="sm-amount" type="number" min=".01" step=".01" placeholder="130"></label><button class="sm-btn" id="sm-add">Record contribution</button>'+
+ '<h3>Record actual money put aside</h3><label>Driver<select id="sm-driver"><option value="me">You</option><option value="brother">Brother</option></select></label><label>Purpose<select id="sm-pot"><option value="rent">Rent</option><option value="other">Other bills</option></select></label><label>Amount (£)<input id="sm-amount" type="number" min=".01" step=".01" placeholder="0 is fine"></label><button class="sm-btn" id="sm-add">Record contribution</button>'+
  '<p class="sm-muted">Only enter money really set aside. These entries do not modify existing Money Pots or earnings records.</p><h3>Recorded contributions</h3>'+(lines||'<p class="sm-muted">None yet.</p>')+
  '<button class="sm-btn" id="sm-export">Download planner and shift backup</button><p class="sm-muted">Fuel is tracked as purchases, not matched daily consumption. Phone-lock GPS can miss miles. Profits and safe-to-spend are not verified without complete expenses and account balances.</p></section></div>';
  modal.querySelector('#sm-close').onclick=close;
@@ -60,7 +60,7 @@ function render(){
  };
  modal.querySelector('#sm-add').onclick=()=>{
  const amount=Number(modal.querySelector('#sm-amount').value);
- if(!Number.isFinite(amount)||amount<=0){alert('Enter a positive amount.');return}
+ if(!Number.isFinite(amount)||amount<0){alert('Enter a valid amount of £0 or more.');return} if(amount===0){alert('£0 saved is valid. No contribution has been added, and your savings remain unchanged.');return}
  state.allocations.push({amount,driver:modal.querySelector('#sm-driver').value,pot:modal.querySelector('#sm-pot').value,date:date(new Date())});save();
  };
  modal.querySelector('#sm-export').onclick=()=>{
