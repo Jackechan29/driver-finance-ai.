@@ -93,6 +93,8 @@ function open(){
  if(state.active&&watch===null){markGap();gps()}
 }
 function close(){if(modal){modal.remove();modal=null}document.body.style.overflow='';}
+window.DFAOpenShift=open;
+
 function updateMileageBanner(){
  let banner=document.getElementById('dfa-mileage-banner');
  if(!banner){banner=document.createElement('div');banner.id='dfa-mileage-banner';banner.setAttribute('role','status');banner.setAttribute('aria-live','off');banner.style.cssText='position:sticky;top:0;z-index:4000;margin:0;padding:10px 15px;background:#06314d;color:#ecffff;border-bottom:1px solid #26a9d9;font:600 14px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 4px 14px #0018';document.body.insertAdjacentElement('afterbegin',banner)}
