@@ -113,6 +113,8 @@ function render(){
 function save(){try{localStorage.setItem(K,JSON.stringify(state));render()}catch(e){alert('Cannot save locally; please back up your records.')}}
 function open(){modal=document.createElement('div');document.body.appendChild(modal);document.body.style.overflow='hidden';render()}
 function close(){if(modal)modal.remove();modal=null;document.body.style.overflow=''}
+window.DFAOpenMoneyGuide=open;
+
 function addCard(){
  const shift=document.getElementById('dfa-entry');if(!shift||document.getElementById('sm-card'))return;
  const card=document.createElement('div');card.id='sm-card';card.className='card';card.style.cssText='background:linear-gradient(130deg,#092a42,#07172b);border:1px solid #24a8a1;color:white';
