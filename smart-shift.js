@@ -5,14 +5,16 @@ const KEY='dfa-shift-tracker-v1';
 let state={active:null,history:[],fuel:[]};
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved&&typeof saved==='object')state={...state,...saved}}catch(e){}
 let watch=null, modal=null;
+let gpsMessage='GPS waiting for a location fix';
 const pounds=n=>'£'+Number(n||0).toFixed(2);
 const save=()=>{try{const clean={...state,active:state.active?{...state.active,last:null}:null};localStorage.setItem(KEY,JSON.stringify(clean))}catch(e){alert('Storage is full. Your shift may not save.')}};
 function markGap(){if(state.active){state.active.incomplete=true;save()}}
-document.addEventListener('visibilitychange',()=>{if(document.hidden)markGap()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){markGap();stopGPS()}else if(state.active){gpsMessage='GPS resuming — mileage may be partial';gps();refresh()}});
 window.addEventListener('pagehide',markGap);
 function stopGPS(){if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}}
 function gps(){
- stopGPS();if(!state.active||!navigator.geolocation)return;
+ stopGPS();if(!state.active||!navigator.geolocation){gpsMessage='GPS unavailable';refresh();return;}
+ gpsMessage='GPS finding position';refresh();
  watch=navigator.geolocation.watchPosition(p=>{
   const a=state.active;if(!a)return;
   if(document.hidden){a.incomplete=true;save();return}
@@ -30,14 +32,14 @@ function gps(){
     if(miles>.012&&speed<100&&c.accuracy<45)a.miles+=miles;
    }
   }
-  a.last={lat:c.latitude,lon:c.longitude,time:t};a.samples=(a.samples||0)+1;save();refresh();
- },()=>{markGap();refresh()}, {enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  a.last={lat:c.latitude,lon:c.longitude,time:t};a.samples=(a.samples||0)+1;gpsMessage='GPS receiving positions';save();refresh();
+ },e=>{gpsMessage=e&&e.code===1?'Location access denied':'GPS signal unavailable';markGap();refresh()}, {enableHighAccuracy:true,maximumAge:0,timeout:20000});
 }
 function start(){
  if(state.active)return;
  const driver=document.getElementById('dfa-driver').value;
  state.active={driver,start:new Date().toISOString(),miles:0,samples:0,last:null,incomplete:false};
- save();gps();render();
+ save();gps();render();refresh();
 }
 function finish(){
  const a=state.active;if(!a)return;
@@ -47,7 +49,7 @@ function finish(){
  if(!Number.isFinite(earnings)||earnings<0||!Number.isFinite(odometer)||odometer<0){alert('Enter valid amounts.');return}
  const end=new Date().toISOString();
  const shift={id:Date.now(),driver:a.driver,start:a.start,end,trackedMiles:Math.round(a.miles*10)/10,odometerMiles:odometer>0?odometer:null,incomplete:a.incomplete||a.samples<2,earnings:Math.round(earnings*100)/100};
- state.history.unshift(shift);state.active=null;save();render();
+ state.history.unshift(shift);state.active=null;gpsMessage='No shift active';save();render();refresh();
 }
 function addFuel(){
  const driver=document.getElementById('dfa-fuel-driver').value,amount=Number(document.getElementById('dfa-fuel-amount').value);
@@ -67,9 +69,10 @@ function modalHtml(){
  '<p class="dfa-note">Shift and fuel records save to this device only. They do not yet change existing Money Pots or earnings totals, preventing double-counting.</p></section></div>';
 }
 function refresh(){
+ updateMileageBanner();
  const m=document.getElementById('dfa-live-miles'),n=document.getElementById('dfa-gps-note');
  if(m&&state.active)m.textContent=state.active.miles.toFixed(1)+' miles tracked';
- if(n&&state.active)n.textContent=state.active.incomplete?'GPS coverage interrupted — verify odometer':'GPS active while app is open';
+ if(n&&state.active)n.textContent=state.active.incomplete?'GPS coverage interrupted — verify odometer':gpsMessage;
 }
 function render(){
  if(!modal)return;
@@ -86,6 +89,14 @@ function open(){
  if(state.active&&watch===null){markGap();gps()}
 }
 function close(){if(modal){modal.remove();modal=null}document.body.style.overflow='';}
+function updateMileageBanner(){
+ let banner=document.getElementById('dfa-mileage-banner');
+ if(!banner){banner=document.createElement('div');banner.id='dfa-mileage-banner';banner.setAttribute('role','status');banner.setAttribute('aria-live','off');banner.style.cssText='position:sticky;top:0;z-index:4000;margin:0;padding:10px 15px;background:#06314d;color:#ecffff;border-bottom:1px solid #26a9d9;font:600 14px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 4px 14px #0018';document.body.insertAdjacentElement('afterbegin',banner)}
+ const a=state.active;
+ if(!a){banner.textContent='🚕 Shift mileage: no shift active · Open Smart Shift & Fuel to start';return}
+ const partial=a.incomplete||document.hidden;
+ banner.innerHTML='<div style="font-size:18px;color:#65efda">🚕 '+a.miles.toFixed(1)+' miles recorded</div><div style="font-size:12px;font-weight:500">'+(partial?'⚠️ GPS coverage interrupted · total may be incomplete':gpsMessage)+' · Check odometer at end</div>';
+}
 function addEntry(){
  const v=document.getElementById('view');if(!v||document.getElementById('dfa-entry'))return;
  const div=document.createElement('div');div.id='dfa-entry';div.className='card';div.style.cssText='margin:14px 0;border:1px solid #1b9cff;box-shadow:0 0 18px #0876d044;background:linear-gradient(125deg,#092443,#07172b)';
@@ -109,7 +120,8 @@ function init(){
  window.show=function(name){const result=original.apply(this,arguments);if(name==='home')addEntry();return result};
  }
  if(document.getElementById('view'))addEntry();
- if(state.active){state.active.incomplete=true;save()} // App may have been closed during an active shift.
+ if(state.active){state.active.incomplete=true;save();if(!document.hidden)gps()} // A reopened app cannot recover missed GPS points.
+ updateMileageBanner();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
