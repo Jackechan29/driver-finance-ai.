@@ -6,6 +6,7 @@ let state={active:null,history:[],fuel:[]};
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved&&typeof saved==='object')state={...state,...saved}}catch(e){}
 let watch=null, modal=null;
 let gpsMessage='GPS waiting for a location fix';
+let gpsLastFix=null, gpsAccuracy=null, gpsRejected=0, gpsError=null;
 const pounds=n=>'£'+Number(n||0).toFixed(2);
 const save=()=>{try{const clean={...state,active:state.active?{...state.active,last:null}:null};localStorage.setItem(KEY,JSON.stringify(clean))}catch(e){alert('Storage is full. Your shift may not save.')}};
 function markGap(){if(state.active){state.active.incomplete=true;save()}}
@@ -14,12 +15,13 @@ window.addEventListener('pagehide',markGap);
 function stopGPS(){if(watch!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watch);watch=null}}
 function gps(){
  stopGPS();if(!state.active||!navigator.geolocation){gpsMessage='GPS unavailable';refresh();return;}
- gpsMessage='GPS finding position';refresh();
+ gpsMessage='Waiting for GPS fix';gpsError=null;refresh();
  watch=navigator.geolocation.watchPosition(p=>{
   const a=state.active;if(!a)return;
   if(document.hidden){a.incomplete=true;save();return}
   const c=p.coords,t=p.timestamp||Date.now();
-  if(c.accuracy>70||!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude))return;
+  gpsLastFix=Date.now();gpsAccuracy=Math.round(c.accuracy||0);gpsError=null;
+  if(!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude)||c.accuracy>100){gpsRejected++;gpsMessage='GPS fix too inaccurate ('+gpsAccuracy+' m)';refresh();return;}
   if(a.last){
    const dt=(t-a.last.time)/1000;
    if(dt>90){a.incomplete=true}
@@ -29,16 +31,17 @@ function gps(){
     const q=Math.sin(dlat/2)**2+Math.cos(rad(a.last.lat))*Math.cos(rad(c.latitude))*Math.sin(dlon/2)**2;
     const miles=2*R*Math.asin(Math.min(1,Math.sqrt(q)));
     const speed=miles/(dt/3600);
-    if(miles>.012&&speed<100&&c.accuracy<45)a.miles+=miles;
+    if(miles>.006&&speed<100&&c.accuracy<=100&&a.last.accuracy<=100)a.miles+=miles;
+    else if(miles>.006){gpsRejected++;gpsMessage='GPS movement filtered ('+Math.round(speed)+' mph)'}
    }
   }
-  a.last={lat:c.latitude,lon:c.longitude,time:t};a.samples=(a.samples||0)+1;gpsMessage='GPS receiving positions';save();refresh();
- },e=>{gpsMessage=e&&e.code===1?'Location access denied':'GPS signal unavailable';markGap();refresh()}, {enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  a.last={lat:c.latitude,lon:c.longitude,time:t,accuracy:c.accuracy};a.samples=(a.samples||0)+1;if(!gpsMessage.startsWith('GPS movement filtered'))gpsMessage='GPS connected';save();refresh();
+ },e=>{gpsError=e&&e.message||'Location unavailable';gpsMessage=e&&e.code===1?'GPS denied: allow location access':e&&e.code===3?'GPS timeout: try outdoors':'GPS error: '+gpsError;markGap();refresh()}, {enableHighAccuracy:true,maximumAge:0,timeout:20000});
 }
 function start(){
  if(state.active)return;
  const driver=document.getElementById('dfa-driver').value;
- state.active={driver,start:new Date().toISOString(),miles:0,samples:0,last:null,incomplete:false};
+ state.active={driver,start:new Date().toISOString(),miles:0,samples:0,last:null,incomplete:false};gpsLastFix=null;gpsAccuracy=null;gpsRejected=0;gpsError=null;
  save();gps();render();refresh();
 }
 function finish(){
@@ -48,7 +51,7 @@ function finish(){
  const odometer=Number(document.getElementById('dfa-odo').value||0);
  if(!Number.isFinite(earnings)||earnings<0||!Number.isFinite(odometer)||odometer<0){alert('Enter valid amounts.');return}
  const end=new Date().toISOString();
- const shift={id:Date.now(),driver:a.driver,start:a.start,end,trackedMiles:Math.round(a.miles*10)/10,odometerMiles:odometer>0?odometer:null,incomplete:a.incomplete||a.samples<2,earnings:Math.round(earnings*100)/100};
+ const shift={id:Date.now(),driver:a.driver,start:a.start,end,trackedMiles:Math.round(a.miles*10)/10,odometerMiles:odometer>0?odometer:null,incomplete:a.incomplete||a.samples<2||a.miles===0,earnings:Math.round(earnings*100)/100};
  state.history.unshift(shift);state.active=null;gpsMessage='No shift active';save();render();refresh();
 }
 function addFuel(){
@@ -59,10 +62,10 @@ function addFuel(){
 function modalHtml(){
  const a=state.active;
  const fuel=state.fuel.slice(0,8).map(f=>'<div class="dfa-line">'+(f.driver==='brother'?'Brother':'You')+' · '+new Date(f.date).toLocaleDateString('en-GB')+' <strong>'+pounds(f.amount)+'</strong></div>').join('');
- const history=state.history.slice(0,8).map(s=>'<div class="dfa-line"><strong>'+(s.driver==='brother'?'Brother':'You')+'</strong> · '+new Date(s.start).toLocaleDateString('en-GB')+' · '+((Date.parse(s.end)-Date.parse(s.start))/3600000).toFixed(1)+' hours · '+(s.odometerMiles??s.trackedMiles).toFixed(1)+' mi '+(s.incomplete?'(GPS partial)':'(GPS tracked)')+' · '+pounds(s.earnings)+'</div>').join('');
+ const history=state.history.slice(0,8).map(s=>'<div class="dfa-line"><strong>'+(s.driver==='brother'?'Brother':'You')+'</strong> · '+new Date(s.start).toLocaleDateString('en-GB')+' · '+((Date.parse(s.end)-Date.parse(s.start))/3600000).toFixed(1)+' hours · '+(s.odometerMiles??s.trackedMiles).toFixed(1)+' mi '+(s.incomplete?'(GPS incomplete / unverified)':'(GPS tracked)')+' · '+pounds(s.earnings)+'</div>').join('');
  return '<div class="dfa-backdrop" id="dfa-backdrop"><section class="dfa-panel" role="dialog" aria-modal="true" aria-label="Shift tracker"><div class="row"><h2>Smart Shift Tracker</h2><button type="button" class="dfa-close" id="dfa-close">✕</button></div>'+
- '<p class="dfa-note">GPS tracking is experimental in this installed web app. Locking the phone or switching apps can interrupt it. Partial mileage is never treated as a complete trip. Use your odometer to verify totals.</p>'+
- (a?'<div class="dfa-status">Shift active · '+(a.driver==='brother'?'Brother':'You')+'<br><strong id="dfa-live-miles">'+a.miles.toFixed(1)+' miles tracked</strong><br><span id="dfa-gps-note">'+(a.incomplete?'GPS coverage interrupted':'Keep app open for GPS tracking')+'</span></div><label>Earnings this shift (£)<input id="dfa-earnings" type="number" min="0" step=".01" value="0"></label><label>Odometer miles driven (optional; recommended)<input id="dfa-odo" type="number" min="0" step=".1" placeholder="Actual miles from dashboard"></label><button class="dfa-main" id="dfa-end">End Shift & Save</button>':
+ '<p class="dfa-note">This is a web app: GPS can stop when you open Uber or lock the phone. Do not treat zero miles as proof that no distance was driven. Check your odometer.</p>'+
+ (a?'<div class="dfa-status">Shift active · '+(a.driver==='brother'?'Brother':'You')+'<br><strong id="dfa-live-miles">'+a.miles.toFixed(1)+' miles tracked</strong><br><span id="dfa-gps-note">'+(a.incomplete?'GPS coverage interrupted':'Keep app open for GPS tracking')+'</span><br><span id="dfa-gps-detail" style="font-size:12px;color:#cce6f6">Waiting for first GPS location…</span></div><label>Earnings this shift (£)<input id="dfa-earnings" type="number" min="0" step=".01" value="0"></label><label>Odometer miles driven (optional; recommended)<input id="dfa-odo" type="number" min="0" step=".1" placeholder="Actual miles from dashboard"></label><button class="dfa-main" id="dfa-end">End Shift & Save</button>':
  '<label>Driver<select id="dfa-driver"><option value="me">My vehicle</option><option value="brother">Brother\'s vehicle</option></select></label><button class="dfa-main" id="dfa-start">▶ Start Shift</button>')+
  '<h3>⛽ Add Fuel</h3><label>Vehicle<select id="dfa-fuel-driver"><option value="me">My vehicle</option><option value="brother">Brother\'s vehicle</option></select></label><label>Amount (£)<input id="dfa-fuel-amount" type="number" min=".01" step=".01" placeholder="60.00"></label><button class="dfa-main dfa-secondary" id="dfa-add-fuel">Save fuel expense</button>'+
  '<h3>Fuel records</h3>'+(fuel||'<p class="dfa-note">No fuel entries yet.</p>')+'<h3>Saved shifts</h3>'+(history||'<p class="dfa-note">No completed shifts yet.</p>')+
@@ -72,7 +75,8 @@ function refresh(){
  updateMileageBanner();
  const m=document.getElementById('dfa-live-miles'),n=document.getElementById('dfa-gps-note');
  if(m&&state.active)m.textContent=state.active.miles.toFixed(1)+' miles tracked';
- if(n&&state.active)n.textContent=state.active.incomplete?'GPS coverage interrupted — verify odometer':gpsMessage;
+ if(n&&state.active)n.textContent=state.active.incomplete?'GPS incomplete — '+gpsMessage:gpsMessage;
+ const detail=document.getElementById('dfa-gps-detail');if(detail&&state.active)detail.textContent='GPS fixes: '+(state.active.samples||0)+' · accuracy: '+(gpsAccuracy===null?'unknown':gpsAccuracy+' m')+' · rejected: '+gpsRejected+' · last fix: '+(gpsLastFix?Math.round((Date.now()-gpsLastFix)/1000)+' seconds ago':'none')+(gpsError?' · '+gpsError:'');
 }
 function render(){
  if(!modal)return;
@@ -95,7 +99,8 @@ function updateMileageBanner(){
  const a=state.active;
  if(!a){banner.textContent='🚕 Shift mileage: no shift active · Open Smart Shift & Fuel to start';return}
  const partial=a.incomplete||document.hidden;
- banner.innerHTML='<div style="font-size:18px;color:#65efda">🚕 '+a.miles.toFixed(1)+' miles recorded</div><div style="font-size:12px;font-weight:500">'+(partial?'⚠️ GPS coverage interrupted · total may be incomplete':gpsMessage)+' · Check odometer at end</div>';
+ const info=(a.samples||0)+' GPS fixes · accuracy '+(gpsAccuracy===null?'unknown':gpsAccuracy+'m')+' · last fix '+(gpsLastFix?Math.round((Date.now()-gpsLastFix)/1000)+'s ago':'none');
+ banner.innerHTML='<div style="font-size:18px;color:#65efda">🚕 '+a.miles.toFixed(1)+' miles recorded</div><div style="font-size:12px;font-weight:500">'+(partial?'⚠️ GPS coverage interrupted · total may be incomplete':gpsMessage)+' · '+info+' · Check odometer at end</div>';
 }
 function addEntry(){
  const v=document.getElementById('view');if(!v||document.getElementById('dfa-entry'))return;
