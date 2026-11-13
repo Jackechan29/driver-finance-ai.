@@ -6,7 +6,7 @@ let state={active:null,history:[],fuel:[]};
 try{const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved&&typeof saved==='object')state={...state,...saved}}catch(e){}
 let watch=null, modal=null;
 const pounds=n=>'£'+Number(n||0).toFixed(2);
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){alert('Storage is full. Your shift may not save.')}};
+const save=()=>{try{const clean={...state,active:state.active?{...state.active,last:null}:null};localStorage.setItem(KEY,JSON.stringify(clean))}catch(e){alert('Storage is full. Your shift may not save.')}};
 function markGap(){if(state.active){state.active.incomplete=true;save()}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)markGap()});
 window.addEventListener('pagehide',markGap);
@@ -15,7 +15,7 @@ function gps(){
  stopGPS();if(!state.active||!navigator.geolocation)return;
  watch=navigator.geolocation.watchPosition(p=>{
   const a=state.active;if(!a)return;
-  const c=p.coords,t=p.timestamp||Date.now();
+  if(document.hidden){a.incomplete=true;save();return}\n  const c=p.coords,t=p.timestamp||Date.now();
   if(c.accuracy>70||!Number.isFinite(c.latitude)||!Number.isFinite(c.longitude))return;
   if(a.last){
    const dt=(t-a.last.time)/1000;
